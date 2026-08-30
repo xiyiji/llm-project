@@ -109,3 +109,12 @@ def test_api_failure_degrades_to_rules(monkeypatch, tmp_path):
     assert exception.decision is not None
     assert exception.provider == "rules"
     assert exception.decision.resolution.value == "REPLACE"
+
+
+def test_root_landing_page(offline):
+    from app import api
+
+    client = TestClient(api.app)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Delivery Exception Handler" in response.text

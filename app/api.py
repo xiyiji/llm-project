@@ -3,6 +3,7 @@
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 
 from app.config import get_config
 from app.evaluation import evaluate
@@ -18,6 +19,26 @@ app = FastAPI(
 )
 
 _pipeline = Pipeline()
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def index() -> str:
+    return """<!doctype html><html><head><meta charset="utf-8">
+<title>Delivery Exception Handler</title>
+<style>body{font-family:system-ui,sans-serif;max-width:640px;margin:60px auto;padding:0 20px;line-height:1.7;color:#222}
+a{color:#8a4b0f}li{margin:6px 0}</style></head><body>
+<h1>Delivery Exception Handler</h1>
+<p>This service reads courier scan logs, spots failed deliveries (nobody home,
+damaged box, wrong address...), decides what to do next by the company
+playbook, and writes the message the customer receives.</p>
+<ul>
+<li><a href="/docs">Try the API</a> (run POST /process, then look at GET /metrics)</li>
+<li><a href="/health">Health</a> &middot; <a href="/metrics">Metrics</a> &middot; <a href="/cases">Cases</a></li>
+<li>Source: <a href="https://github.com/xiyiji/llm-project">github.com/xiyiji/llm-project</a></li>
+</ul>
+<p>Sister project: <b>LLM Router</b>, which picks the best AI model per request:
+<a href="https://llm-router-api-9uqw.onrender.com">llm-router-api-9uqw.onrender.com</a></p>
+</body></html>"""
 
 
 @app.get("/health")
