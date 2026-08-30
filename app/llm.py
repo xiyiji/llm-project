@@ -118,13 +118,18 @@ class DeepSeekClient:
 
         start = time.time()
         kwargs = {"response_format": {"type": "json_object"}} if json_mode else {}
-        completion = self._sdk().chat.completions.create(
-            model=self.cfg.model,
-            messages=messages,
-            temperature=self.cfg.temperature,
-            max_tokens=self.cfg.max_tokens,
-            **kwargs,
-        )
+        try:
+            completion = self._sdk().chat.completions.create(
+                model=self.cfg.model,
+                messages=messages,
+                temperature=self.cfg.temperature,
+                max_tokens=self.cfg.max_tokens,
+                **kwargs,
+            )
+        except Exception as exc:
+            # Any API failure (auth, balance, rate limit, network) degrades to
+            # the rules baseline instead of surfacing a 500.
+            raise LLMUnavailableError(f"{type(exc).__name__}: {exc}") from exc
         text = completion.choices[0].message.content or ""
         latency_ms = int((time.time() - start) * 1000)
         if self.cache_enabled:

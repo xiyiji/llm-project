@@ -88,3 +88,24 @@ def test_api_endpoints(offline):
 
     report = client.post("/evaluate").json()
     assert report["task_completion_rate"] == 1.0
+
+
+def test_api_failure_degrades_to_rules(monkeypatch, tmp_path):
+    """A failing LLM API (bad key, no balance, outage) must not 500."""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-invalid")
+    from app.llm import DeepSeekClient
+
+    class _Boom:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    raise RuntimeError("Error code: 402 - Insufficient Balance")
+
+    monkeypatch.setattr(DeepSeekClient, "_sdk", lambda self: _Boom)
+    pipe = Pipeline(store=CaseStore(db_path=tmp_path / "c.db"), client=DeepSeekClient())
+    records = pipe.process_shipment("SHP-004")
+    exception = [r for r in records if r.triage.is_exception][0]
+    assert exception.decision is not None
+    assert exception.provider == "rules"
+    assert exception.decision.resolution.value == "REPLACE"
