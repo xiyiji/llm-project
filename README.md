@@ -122,6 +122,16 @@ exception history, credits; locker locations and capacity),
 `ground_truth.csv` (row-aligned labels), `playbook.md` (the resolution
 playbook, canonical retrieval source; original PDF alongside).
 
+## Benchmarks
+
+`scripts/load_test.py` against `POST /process/SHP-003` (full pipeline per
+request: triage, resolution, communication drafting, SQLite write) on a single
+uvicorn worker, rules path, M-series MacBook:
+
+| concurrency | requests | RPS | P50 | P95 | P99 | errors |
+|---|---|---|---|---|---|---|
+| 20 | 1000 | 676 | 16 ms | 89 ms | 145 ms | 0 |
+
 ## Known limits
 
 The LLM path needs a `DEEPSEEK_API_KEY`; until one is set the service runs
