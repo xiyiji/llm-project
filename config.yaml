@@ -1,0 +1,24 @@
+llm:
+  provider: "deepseek"
+  model: "deepseek-chat"
+  base_url: "https://api.deepseek.com"
+  api_key_env: "DEEPSEEK_API_KEY"
+  temperature: 0.0
+  max_tokens: 1024
+  timeout_s: 30
+
+cache:
+  enabled: true
+  max_entries: 512
+  ttl_seconds: 3600
+
+thresholds:
+  perishable_delay_hours: 4.0
+  premium_perishable_delay_hours: 2.0
+  vip_exception_threshold: 3
+  standard_exception_threshold: 5
+  escalation_attempt_number: 3
+
+api:
+  host: "0.0.0.0"
+  port: 8010
