@@ -32,7 +32,7 @@ screened against prompt-injection patterns; a flagged note is still processed
 but marked for review, and notes are always passed to the LLM as data, never
 as instructions.
 
-**Resolution: the LLM proposes, the policy engine disposes.** A deterministic
+**Resolution.** The LLM proposes, the rule engine has the final say. A deterministic
 rule engine implements the playbook: damage severity grading (with the fragile
 one-level bump), the 4-hour perishable weather threshold, locker eligibility
 (size vs capacity, FULL/LIMITED status, same-or-adjacent zip, never
@@ -56,11 +56,11 @@ revision, then falls back to a template that always passes.
 document). `GET /playbook/search?q=damaged perishable` shows what the
 resolution agent sees.
 
-**Caching, for real.** All LLM calls go through an LRU+TTL response cache
+**Caching.** All LLM calls go through an LRU+TTL response cache
 keyed on the full request (model, messages, temperature). Hit/miss counters
 are exposed at `/metrics`; the `cached` flag on a case is set only when a call
 actually came from the cache. Temperature 0 makes repeated identical events
-(a batch reprocess, duplicate-heavy feeds) genuine cache hits.
+(a batch reprocess, duplicate-heavy feeds) real cache hits.
 
 **Persistence.** Every case lands in SQLite with its full decision trail;
 metrics survive restarts.
@@ -79,7 +79,7 @@ against it:
 | tone accuracy | 1.00 |
 | task completion | 1.00 |
 
-The deterministic baseline hitting 100% is the point: the playbook is fully
+The 100% baseline is intentional: the playbook is fully
 encoded, so the LLM adds judgment on messy free text and natural-language
 drafting on top of a floor that cannot regress. The same harness scores the
 LLM-assisted path, so any model or prompt change is measurable.

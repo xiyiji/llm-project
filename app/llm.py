@@ -1,9 +1,9 @@
 """LLM access layer: DeepSeek client behind a real response cache.
 
 The cache is keyed on the full request (model, messages, temperature) and
-tracks hit/miss counters; `cached` in responses and metrics is genuine.
-Without DEEPSEEK_API_KEY the provider reports unavailable and callers fall
-back to the deterministic policy engine.
+tracks hit/miss counters, so the cached flag in responses and metrics comes
+from actual cache lookups. Without DEEPSEEK_API_KEY (or on any API failure)
+callers fall back to the deterministic policy engine.
 """
 
 import hashlib

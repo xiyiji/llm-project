@@ -1,7 +1,7 @@
 """Deterministic policy engine derived from the exception resolution playbook.
 
-The LLM proposes; these rules enforce. Hard escalation triggers and resolution
-constraints from the playbook always win over model output.
+Hard escalation triggers and resolution constraints from the playbook always
+win over model output.
 """
 
 import re

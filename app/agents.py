@@ -1,9 +1,9 @@
 """Resolution and communication agents.
 
-Design: the LLM proposes, the policy engine disposes. Both agents always compute
-a deterministic playbook baseline; when DeepSeek is available its judgment and
-prose are used, but hard escalation triggers and resolution constraints are
-enforced in code, and every override is recorded.
+Both agents compute a deterministic playbook baseline first. When DeepSeek is
+available its judgment and wording are used instead, but hard escalation
+triggers and resolution constraints are enforced in code and every override
+is recorded.
 """
 
 import json
