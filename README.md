@@ -105,7 +105,7 @@ export DEEPSEEK_API_KEY=sk-...        # optional; rules-only without it
 ./venv/bin/python main.py             # API on :8010
 
 # ops console
-./venv/bin/pip install -r requirements-dashboard.txt
+# dashboard deps are in requirements.txt
 ./venv/bin/python -m streamlit run dashboard.py
 ```
 
@@ -131,6 +131,14 @@ uvicorn worker, rules path, M-series MacBook:
 | concurrency | requests | RPS | P50 | P95 | P99 | errors |
 |---|---|---|---|---|---|---|
 | 20 | 1000 | 676 | 16 ms | 89 ms | 145 ms | 0 |
+
+## Deploy
+
+Render: New -> Blueprint -> pick this repo -> Apply (render.yaml builds from
+requirements-api.txt and starts uvicorn). Set DEEPSEEK_API_KEY in the service
+environment to enable the LLM path. Dashboard: share.streamlit.io -> Create
+app -> main file dashboard.py -> add EXCEPTION_API = "https://<render-url>"
+in Secrets.
 
 ## Known limits
 
