@@ -61,11 +61,6 @@ Built with Python, FastAPI, SQLite and Streamlit. Tested in CI on every
 change, ships with a Dockerfile. Engineering details, benchmarks and deploy
 notes: [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-Part of a three-project arc: the routing idea started in
-[llm-router-platform](https://github.com/xiyiji/llm-router-platform) and
-grew into a trained, PPO-optimized routing policy in
-[llm-gateway](https://github.com/xiyiji/llm-gateway).
-
 ## Try it
 
 ```bash
