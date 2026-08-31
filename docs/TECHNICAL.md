@@ -185,3 +185,21 @@ with a reason when unavailable.
 dashboard's case-detail page carries the buttons. Overrides are appended to
 the decision's audit trail, which doubles as free labeled data for tuning
 the cascade thresholds later.
+
+## Live numbers (real DeepSeek calls, 2026-08-30)
+
+Three ambiguous cases pushed through the cascade with a funded API key:
+
+- Weather-delayed perishable, no duration stated: small model consulted,
+  disagreed with the rules baseline on a high-stakes case, escalated to
+  deepseek-reasoner, which agreed with the rules (REPLACE, escalate).
+  Confidence 0.95, $0.0021, 8.9s.
+- Oddly described VIP fragile damage: small model reasoned it out alone
+  (audible shifting -> moderate for fragile -> REPLACE), confidence 0.9,
+  $0.0008, 5.8s. The customer email it drafted passed validation first try.
+- Repeat of the first case: cache hit, $0, 2ms.
+
+Cost per 1,000 exceptions came to $0.95 on this all-ambiguous sample; in the
+synthetic worker bench the realistic mix is dominated by rules-tier cases at
+zero model cost. The judge (deepseek-reasoner) scored both live decisions
+5/5 with grounded rationales.
