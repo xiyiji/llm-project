@@ -32,6 +32,35 @@ def parse_delay_hours(description: str) -> Optional[float]:
     return float(m.group(1)) if m else None
 
 
+def damage_terms_matched(description: str) -> bool:
+    desc = description.lower()
+    return any(
+        t in desc
+        for t in SEVERE_DAMAGE_TERMS + MODERATE_DAMAGE_TERMS + MINOR_DAMAGE_TERMS
+    )
+
+
+def assess_ambiguity(row: LogRow, injection_detected: bool = False) -> Tuple[int, List[str]]:
+    """Score how unclear a case is; 0 means the rules alone are enough."""
+    score, reasons = 0, []
+    if row.status_code == "DAMAGED" and not damage_terms_matched(row.status_description):
+        score += 1
+        reasons.append("damage description matches no known severity terms")
+    if row.status_code == "WEATHER_DELAY" and parse_delay_hours(row.status_description) is None:
+        score += 1
+        reasons.append("delay duration not stated in the driver note")
+    if row.status_code not in ("ATTEMPTED", "ADDRESS_ISSUE", "DAMAGED", "REFUSED", "WEATHER_DELAY"):
+        score += 1
+        reasons.append(f"unrecognized status code {row.status_code}")
+    if injection_detected:
+        score += 1
+        reasons.append("driver note flagged by injection screen; needs judgment")
+    if len(row.status_description) > 220:
+        score += 1
+        reasons.append("unusually long driver note")
+    return score, reasons
+
+
 def damage_severity(description: str, package_type: str) -> str:
     """Return minor / moderate / severe; FRAGILE bumps one level up."""
     desc = description.lower()

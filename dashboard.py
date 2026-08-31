@@ -23,9 +23,9 @@ def fetch(path: str):
         return None
 
 
-def post(path: str):
+def post(path: str, payload: dict = None):
     try:
-        resp = requests.post(f"{API}{path}", timeout=120)
+        resp = requests.post(f"{API}{path}", json=payload, timeout=120)
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException:
@@ -103,6 +103,26 @@ elif page == "Case detail":
             st.info(comm["body"])
             if not comm["validation_passed"]:
                 st.warning("Validation issues: " + "; ".join(comm["validation_issues"]))
+        st.caption(
+            f"Model tier: {picked['model_tier']}, LLM cost: ${picked['llm_cost_usd']:.5f}, "
+            f"review status: {picked['review_status']}"
+        )
+        if picked["review_status"] == "pending_review":
+            st.subheader("Supervisor review")
+            a, b = st.columns(2)
+            if a.button("Approve decision"):
+                result = post(f"/cases/{picked['case_id']}/approve")
+                require(result)
+                st.success("Approved. Refresh to see the updated status.")
+            with b:
+                new_res = st.selectbox("Override resolution", [
+                    "RESCHEDULE", "REROUTE_TO_LOCKER", "REPLACE",
+                    "RETURN_TO_SENDER", "HOLD_FOR_REVIEW", "NO_ACTION",
+                ])
+                if st.button("Override"):
+                    result = post(f"/cases/{picked['case_id']}/override", {"resolution": new_res})
+                    require(result)
+                    st.success(f"Overridden to {new_res}. Refresh to see the updated status.")
 
 elif page == "Metrics":
     st.title("Metrics")
@@ -118,6 +138,18 @@ elif page == "Metrics":
         c[2].metric("Escalation rate", f"{cases['escalation_rate']:.0%}")
         c[3].metric("LLM cache hit rate", f"{cache['hit_rate']:.0%}")
         c[4].metric("Avg latency", f"{cases['avg_latency_ms']:.0f} ms")
+        c2 = st.columns(4)
+        c2[0].metric("LLM cost (total)", f"${cases.get('total_llm_cost_usd', 0):.4f}")
+        c2[1].metric("Cost / 1k exceptions", f"${cases.get('cost_per_1000_exceptions_usd', 0):.4f}")
+        c2[2].metric("Pending review", cases.get("pending_review", 0))
+        rules_share = 0.0
+        tiers = cases.get("by_model_tier", {})
+        if tiers:
+            rules_share = tiers.get("rules", 0) / max(sum(tiers.values()), 1)
+        c2[3].metric("Handled free by rules", f"{rules_share:.0%}")
+        st.subheader("Exceptions by model tier")
+        if tiers:
+            st.bar_chart(pd.Series(tiers))
         st.subheader("By resolution")
         st.bar_chart(pd.Series(cases["by_resolution"]))
         st.subheader("Cache")

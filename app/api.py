@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 
 from app.config import get_config
 from app.evaluation import evaluate
+from app.judge import judge_cases
 from app.llm import get_client
 from app.pipeline import Pipeline
 from app.playbook import search_playbook
@@ -48,7 +49,8 @@ def health() -> dict:
         "status": "healthy",
         "llm": {
             "provider": get_config().llm.provider,
-            "model": get_config().llm.model,
+            "small_model": get_config().llm.small_model,
+            "large_model": get_config().llm.large_model,
             "available": ok,
             **({} if ok else {"reason": reason}),
         },
@@ -79,6 +81,35 @@ def list_cases(shipment_id: Optional[str] = None) -> dict:
     return {"cases": [r.model_dump() for r in _pipeline.store.list_cases(shipment_id)]}
 
 
+@app.post("/cases/{case_id}/approve")
+def approve_case(case_id: str) -> dict:
+    record = _pipeline.store.set_review(case_id, "approved", "supervisor approved the decision")
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"no case {case_id}")
+    return {"case_id": case_id, "review_status": record.review_status}
+
+
+@app.post("/cases/{case_id}/override")
+def override_case(case_id: str, body: dict) -> dict:
+    resolution = body.get("resolution")
+    valid = {"RESCHEDULE", "REROUTE_TO_LOCKER", "REPLACE", "RETURN_TO_SENDER", "HOLD_FOR_REVIEW", "NO_ACTION"}
+    if resolution not in valid:
+        raise HTTPException(status_code=422, detail=f"resolution must be one of {sorted(valid)}")
+    record = _pipeline.store.get(case_id)
+    if record is None or record.decision is None:
+        raise HTTPException(status_code=404, detail=f"no decided case {case_id}")
+    old = record.decision.resolution.value
+    from app.models import Resolution
+
+    record.decision.resolution = Resolution(resolution)
+    record.decision.policy_overrides.append(
+        f"supervisor override: {old} -> {resolution}" + (f" ({body['note']})" if body.get("note") else "")
+    )
+    record.review_status = "overridden"
+    _pipeline.store.save(record)
+    return {"case_id": case_id, "review_status": "overridden", "resolution": resolution}
+
+
 @app.get("/metrics")
 def metrics() -> dict:
     return {
@@ -90,6 +121,19 @@ def metrics() -> dict:
 @app.post("/evaluate")
 def run_evaluation() -> dict:
     return evaluate(_pipeline).model_dump()
+
+
+@app.post("/evaluate/judge")
+def run_llm_judge(sample: int = 10) -> dict:
+    from app.llm import LLMUnavailableError
+
+    ok, reason = _pipeline.client.available()
+    if not ok:
+        raise HTTPException(status_code=503, detail=f"LLM judge unavailable: {reason}")
+    try:
+        return judge_cases(_pipeline.store.list_cases(), _pipeline.client, sample=sample)
+    except LLMUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=f"LLM judge unavailable: {exc}")
 
 
 @app.get("/playbook/search")

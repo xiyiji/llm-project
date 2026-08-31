@@ -5,6 +5,8 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
+from typing import Dict, List
+
 from pydantic import BaseModel, Field
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -14,12 +16,25 @@ VAR_DIR = PROJECT_ROOT / "var"
 
 class LLMConfig(BaseModel):
     provider: str = "deepseek"
-    model: str = "deepseek-chat"
+    small_model: str = "deepseek-chat"
+    large_model: str = "deepseek-reasoner"
     base_url: str = "https://api.deepseek.com"
     api_key_env: str = "DEEPSEEK_API_KEY"
     temperature: float = 0.0
     max_tokens: int = 1024
-    timeout_s: int = 30
+    timeout_s: int = 60
+    pricing_per_1m: Dict[str, Dict[str, float]] = Field(
+        default_factory=lambda: {
+            "deepseek-chat": {"input": 0.27, "output": 1.10},
+            "deepseek-reasoner": {"input": 0.55, "output": 2.19},
+        }
+    )
+
+
+class CascadeConfig(BaseModel):
+    enabled: bool = True
+    confidence_threshold: float = 0.7
+    high_stakes_tiers: List[str] = Field(default_factory=lambda: ["VIP", "PREMIUM"])
 
 
 class CacheConfig(BaseModel):
@@ -43,6 +58,7 @@ class ApiConfig(BaseModel):
 
 class AppConfig(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
+    cascade: CascadeConfig = Field(default_factory=CascadeConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     thresholds: ThresholdsConfig = Field(default_factory=ThresholdsConfig)
     api: ApiConfig = Field(default_factory=ApiConfig)

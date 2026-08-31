@@ -21,11 +21,21 @@ class Pipeline:
         self.communication_agent = CommunicationAgent(self.client)
         self._lockers = list_lockers()
 
-    def process_row(self, row: LogRow, row_index: int, earlier: Optional[List[LogRow]] = None) -> CaseRecord:
+    def process_row(
+        self,
+        row: LogRow,
+        row_index: int,
+        earlier: Optional[List[LogRow]] = None,
+        case_id: Optional[str] = None,
+    ) -> CaseRecord:
+        if case_id is not None:
+            existing = self.store.get(case_id)
+            if existing is not None:
+                return existing  # idempotent: this event was already processed
         start = time.time()
         triage = triage_row(row, earlier)
         record = CaseRecord(
-            case_id=str(uuid.uuid4()),
+            case_id=case_id or str(uuid.uuid4()),
             shipment_id=row.shipment_id,
             row_index=row_index,
             status_code=row.status_code,
@@ -40,18 +50,21 @@ class Pipeline:
                 triage.notes.append(f"unknown customer {row.customer_id}; case held")
             else:
                 decision, dec_cached, dec_latency = self.resolution_agent.decide(
-                    row, customer, self._lockers
+                    row, customer, self._lockers, injection_detected=triage.injection_detected
                 )
                 locker = next(
                     (l for l in self._lockers if l.locker_id == decision.locker_id), None
                 )
-                comm, comm_cached, comm_latency = self.communication_agent.draft(
+                comm, comm_cached, comm_latency, comm_cost = self.communication_agent.draft(
                     row, customer, decision, locker
                 )
                 record.decision = decision
                 record.communication = comm
                 record.cached = dec_cached or comm_cached
                 record.provider = "deepseek" if decision.llm_used else "rules"
+                record.model_tier = decision.model_tier
+                record.llm_cost_usd = round(decision.llm_cost_usd + comm_cost, 8)
+                record.review_status = "pending_review" if decision.escalate else "none"
                 record.latency_ms = dec_latency + comm_latency
 
         if record.latency_ms == 0:

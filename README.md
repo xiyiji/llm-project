@@ -30,6 +30,8 @@ Point it at the raw courier scan feed and it does the whole job:
   friendly text for everyone else.
 - Shows its work. Every decision comes with its reasoning, the playbook
   section it relied on, and a live dashboard for the operations team.
+- Keeps humans in charge. Escalated cases wait for a supervisor, who can
+  approve or override the decision with one click; overrides are logged.
 
 On the labeled test scenarios it gets everything right: the right resolution,
 the right escalation call, the right tone, 100% across the board. Under load
@@ -39,8 +41,10 @@ to the rulebook and keeps going. It does not guess, and it does not go down.
 
 ## The LLM stack
 
-- DeepSeek (deepseek-chat) as the reasoning model, through an
-  OpenAI-compatible API
+- A three-tier model cascade: clear cases are decided by rules for free,
+  ambiguous ones go to a small model (deepseek-chat), and only uncertain
+  high-stakes cases reach the large reasoning model (deepseek-reasoner). The
+  dashboard shows the spend as cost per 1,000 exceptions
 - Retrieval over the company's operations playbook, so decisions are grounded
   in policy rather than model memory
 - A multi-agent pipeline: one agent triages the log stream, one decides the

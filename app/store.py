@@ -21,11 +21,20 @@ CREATE TABLE IF NOT EXISTS cases (
     escalate INTEGER,
     cached INTEGER NOT NULL,
     provider TEXT NOT NULL,
+    model_tier TEXT NOT NULL DEFAULT 'rules',
+    llm_cost_usd REAL NOT NULL DEFAULT 0.0,
+    review_status TEXT NOT NULL DEFAULT 'none',
     latency_ms INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     payload TEXT NOT NULL
 );
 """
+
+_MIGRATIONS = (
+    "ALTER TABLE cases ADD COLUMN model_tier TEXT NOT NULL DEFAULT 'rules'",
+    "ALTER TABLE cases ADD COLUMN llm_cost_usd REAL NOT NULL DEFAULT 0.0",
+    "ALTER TABLE cases ADD COLUMN review_status TEXT NOT NULL DEFAULT 'none'",
+)
 
 
 class CaseStore:
@@ -35,6 +44,11 @@ class CaseStore:
         self._lock = threading.Lock()
         with self._conn() as conn:
             conn.executescript(_SCHEMA)
+            for migration in _MIGRATIONS:
+                try:
+                    conn.execute(migration)
+                except sqlite3.OperationalError:
+                    pass  # column already exists
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
@@ -44,7 +58,11 @@ class CaseStore:
     def save(self, record: CaseRecord) -> None:
         with self._lock, self._conn() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO cases VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO cases "
+                "(case_id, shipment_id, row_index, status_code, customer_id, is_exception, "
+                "resolution, escalate, cached, provider, model_tier, llm_cost_usd, "
+                "review_status, latency_ms, created_at, payload) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     record.case_id,
                     record.shipment_id,
@@ -56,6 +74,9 @@ class CaseStore:
                     int(record.decision.escalate) if record.decision else None,
                     int(record.cached),
                     record.provider,
+                    record.model_tier,
+                    record.llm_cost_usd,
+                    record.review_status,
                     record.latency_ms,
                     record.created_at,
                     record.model_dump_json(),
@@ -104,6 +125,19 @@ class CaseStore:
             avg_latency = conn.execute(
                 "SELECT AVG(latency_ms) a FROM cases WHERE is_exception = 1"
             ).fetchone()["a"]
+            by_tier = {
+                r["model_tier"]: r["c"]
+                for r in conn.execute(
+                    "SELECT model_tier, COUNT(*) c FROM cases "
+                    "WHERE is_exception = 1 GROUP BY model_tier"
+                )
+            }
+            total_llm_cost = conn.execute(
+                "SELECT COALESCE(SUM(llm_cost_usd), 0.0) s FROM cases"
+            ).fetchone()["s"]
+            pending_review = conn.execute(
+                "SELECT COUNT(*) c FROM cases WHERE review_status = 'pending_review'"
+            ).fetchone()["c"]
         return {
             "total_cases": total,
             "exceptions": exceptions,
@@ -113,8 +147,24 @@ class CaseStore:
             "case_cache_hits": cached,
             "by_resolution": by_resolution,
             "by_provider": by_provider,
+            "by_model_tier": by_tier,
+            "total_llm_cost_usd": round(total_llm_cost, 8),
+            "cost_per_1000_exceptions_usd": (
+                round(total_llm_cost / exceptions * 1000, 6) if exceptions else 0.0
+            ),
+            "pending_review": pending_review,
             "avg_latency_ms": round(avg_latency or 0.0, 2),
         }
+
+    def set_review(self, case_id: str, status: str, note: str = "") -> Optional[CaseRecord]:
+        record = self.get(case_id)
+        if record is None:
+            return None
+        record.review_status = status
+        if note and record.decision:
+            record.decision.policy_overrides.append(note)
+        self.save(record)
+        return record
 
     def clear(self) -> None:
         with self._lock, self._conn() as conn:

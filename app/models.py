@@ -77,6 +77,10 @@ class ResolutionDecision(BaseModel):
     llm_used: bool = False
     llm_agreed: Optional[bool] = None
     policy_overrides: List[str] = Field(default_factory=list)
+    model_tier: str = "rules"
+    cascade_reasons: List[str] = Field(default_factory=list)
+    llm_confidence: Optional[float] = None
+    llm_cost_usd: float = 0.0
 
 
 class CommunicationDraft(BaseModel):
@@ -102,6 +106,9 @@ class CaseRecord(BaseModel):
     cached: bool = False
     latency_ms: int = 0
     provider: str = "rules"
+    model_tier: str = "rules"
+    llm_cost_usd: float = 0.0
+    review_status: str = "none"
     created_at: str = ""
 
 

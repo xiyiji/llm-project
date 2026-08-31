@@ -150,3 +150,38 @@ same interfaces. Notifications are drafted but not sent; an SMS/email gateway
 integration is the natural next step. The dataset is small by design; the
 generator script exists to stress volume, but real-world log variety will
 need prompt and rule tuning against production samples.
+
+## v2: cascade, queue, shared cache, judge, review
+
+**Three-tier model cascade.** Tier 0 is the rule engine: cases with zero
+ambiguity signals (clear damage terms, parseable delays, known status codes)
+never touch a model. Ambiguous cases go to deepseek-chat with playbook context
+and must return a confidence figure. The large model (deepseek-reasoner) is
+consulted only when the small model's confidence is below the configured
+threshold, or when it disagrees with the rules baseline on a high-stakes case
+(VIP/Premium or an already-triggered escalation). Token usage is read from
+each response and priced per model, so /metrics reports real spend:
+by_model_tier, total_llm_cost_usd, and cost_per_1000_exceptions_usd.
+
+**Queue and workers.** app/queuing.py gives the pipeline an event-queue front:
+in-memory by default, Redis Streams (consumer group) when REDIS_URL is set.
+Case ids are uuid5 hashes of the event key, so redelivered events are skipped,
+not double-processed. scripts/run_workers.py benchmarks the pool; on a
+laptop, 8 workers drain 5,200 enqueued events (200 of them deliberate
+redeliveries) into exactly 5,000 unique cases at ~935 events/s on the rules
+path.
+
+**Shared cache.** With REDIS_URL set, the LLM response cache moves from
+per-process LRU to Redis with TTL, so all workers share hits. docker-compose
+up starts redis plus the API wired together.
+
+**LLM-as-judge.** POST /evaluate/judge samples processed cases and has the
+large model grade each decision's grounding and coherence 1-5, extending
+quality measurement beyond the 13 labeled rows. Gated on the API key; 503
+with a reason when unavailable.
+
+**Supervisor review.** Escalated cases land as pending_review. POST
+/cases/{id}/approve and /cases/{id}/override close the loop, and the
+dashboard's case-detail page carries the buttons. Overrides are appended to
+the decision's audit trail, which doubles as free labeled data for tuning
+the cascade thresholds later.
